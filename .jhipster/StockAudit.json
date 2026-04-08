@@ -1,0 +1,83 @@
+{
+  "applications": ["TuniSalesGateway", "InventoryService"],
+  "changelogDate": "20260304094138",
+  "clientRootFolder": "InventoryService",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "embedded": false,
+  "entityTableName": "stock_audit",
+  "fields": [
+    {
+      "fieldName": "tenantId",
+      "fieldType": "Long",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "AuditStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "IN_PROGRESS,CLOSED,CANCELLED"
+    },
+    {
+      "fieldName": "theoreticalCount",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "physicalCount",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "discrepancyCount",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "notes",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "2000"
+    },
+    {
+      "fieldName": "auditorLogin",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "maxlength"],
+      "fieldValidateRulesMaxlength": "100"
+    },
+    {
+      "fieldName": "startedAt",
+      "fieldType": "ZonedDateTime",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "closedAt",
+      "fieldType": "ZonedDateTime"
+    }
+  ],
+  "fluentMethods": true,
+  "jpaMetamodelFiltering": true,
+  "microserviceName": "InventoryService",
+  "name": "StockAudit",
+  "pagination": "pagination",
+  "readOnly": false,
+  "relationships": [
+    {
+      "otherEntityName": "stockAuditLine",
+      "otherEntityRelationshipName": "audit",
+      "relationshipName": "auditLines",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "warehouse",
+      "relationshipName": "warehouse",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    }
+  ],
+  "service": "serviceClass"
+}

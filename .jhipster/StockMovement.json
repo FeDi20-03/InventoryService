@@ -1,0 +1,75 @@
+{
+  "applications": ["TuniSalesGateway", "InventoryService"],
+  "changelogDate": "20260304094438",
+  "clientRootFolder": "InventoryService",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "embedded": false,
+  "entityTableName": "stock_movement",
+  "fields": [
+    {
+      "fieldName": "movementType",
+      "fieldType": "MovementType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "INBOUND,OUTBOUND,TRANSFER,RETURN,SWAP_OUT,SWAP_IN,INVENTORY_ADJUSTMENT"
+    },
+    {
+      "fieldName": "reason",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "reference",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "100"
+    },
+    {
+      "fieldName": "quantity",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "performedByLogin",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "100"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "ZonedDateTime",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "fluentMethods": true,
+  "jpaMetamodelFiltering": true,
+  "microserviceName": "InventoryService",
+  "name": "StockMovement",
+  "pagination": "pagination",
+  "readOnly": false,
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "warehouse",
+      "relationshipName": "fromWarehouse",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "warehouse",
+      "relationshipName": "toWarehouse",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "imei",
+      "otherEntityName": "stockItem",
+      "otherEntityRelationshipName": "stockMovements",
+      "relationshipName": "stockItem",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    }
+  ],
+  "service": "serviceClass"
+}

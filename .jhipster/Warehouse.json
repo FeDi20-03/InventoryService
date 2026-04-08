@@ -1,0 +1,75 @@
+{
+  "applications": ["TuniSalesGateway", "InventoryService"],
+  "changelogDate": "20260304094638",
+  "clientRootFolder": "InventoryService",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "embedded": false,
+  "entityTableName": "warehouse",
+  "fields": [
+    {
+      "fieldName": "tenantId",
+      "fieldType": "Long",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "maxlength"],
+      "fieldValidateRulesMaxlength": "255"
+    },
+    {
+      "fieldName": "type",
+      "fieldType": "WarehouseType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "LOCAL,SITE,SWAP,DEFECTIVE,MISSING"
+    },
+    {
+      "fieldName": "address",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "city",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "100"
+    },
+    {
+      "fieldName": "minThreshold",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "isActive",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "ZonedDateTime",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "updatedAt",
+      "fieldType": "ZonedDateTime"
+    }
+  ],
+  "fluentMethods": true,
+  "jpaMetamodelFiltering": true,
+  "microserviceName": "InventoryService",
+  "name": "Warehouse",
+  "pagination": "pagination",
+  "readOnly": false,
+  "relationships": [
+    {
+      "otherEntityName": "stockItem",
+      "otherEntityRelationshipName": "warehouse",
+      "relationshipName": "stockItems",
+      "relationshipType": "one-to-many"
+    }
+  ],
+  "service": "serviceClass"
+}

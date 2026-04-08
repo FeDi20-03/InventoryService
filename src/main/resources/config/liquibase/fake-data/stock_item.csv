@@ -1,0 +1,11 @@
+id;tenant_id;product_id;product_name;imei;status;is_deleted;acquired_at;updated_at;warehouse_id
+1;26587;81363;Crossing North;AdministratorXX;MISSING;true;2026-03-03T18:25:47;2026-03-03T22:55:08;1
+2;73898;28865;Car Maryland Future;1080pXXXXXXXXXX;RETIRED;false;2026-03-03T18:27:44;2026-03-03T23:10:29;2
+3;7037;61596;payment;magnetic bus ta;IN_TRANSIT;false;2026-03-03T20:02:13;2026-03-03T14:20:59;3
+4;92897;55213;Unit;array ProfoundX;SOLD;true;2026-03-03T19:36:11;2026-03-03T22:21:17;4
+5;44969;58927;Technician modular;Pataca CreditXX;DEPLOYED;false;2026-03-03T19:41:06;2026-03-03T16:05:02;5
+6;93520;71525;visualize;SausagesXXXXXXX;DEPLOYED;true;2026-03-04T01:51:00;2026-03-04T04:48:38;6
+7;88741;38621;Maryland benchmark;SDDXXXXXXXXXXXX;MISSING;true;2026-03-03T11:47:18;2026-03-04T06:09:40;7
+8;45283;98732;Korean back-end Seychelles;primary solutio;SOLD;true;2026-03-03T15:34:50;2026-03-04T01:14:35;8
+9;86803;43014;visualize programming;synthesize arra;SOLD;false;2026-03-03T22:42:36;2026-03-03T10:04:27;9
+10;78428;47897;ivory HDD;HomeXXXXXXXXXXX;ALLOCATED;false;2026-03-03T16:56:24;2026-03-04T02:36:52;10

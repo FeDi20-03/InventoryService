@@ -1,0 +1,55 @@
+{
+  "applications": ["TuniSalesGateway", "InventoryService"],
+  "changelogDate": "20260304094238",
+  "clientRootFolder": "InventoryService",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "embedded": false,
+  "entityTableName": "stock_audit_line",
+  "fields": [
+    {
+      "fieldName": "foundPhysically",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "resolution",
+      "fieldType": "AuditResolution",
+      "fieldValues": "FOUND,LOST_STOLEN,SYSTEM_ERROR,IN_PROGRESS"
+    },
+    {
+      "fieldName": "resolutionNote",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "ZonedDateTime",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "fluentMethods": true,
+  "jpaMetamodelFiltering": false,
+  "microserviceName": "InventoryService",
+  "name": "StockAuditLine",
+  "pagination": "pagination",
+  "readOnly": false,
+  "relationships": [
+    {
+      "otherEntityField": "imei",
+      "otherEntityName": "stockItem",
+      "relationshipName": "stockItem",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    },
+    {
+      "otherEntityName": "stockAudit",
+      "otherEntityRelationshipName": "auditLines",
+      "relationshipName": "audit",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    }
+  ],
+  "service": "serviceClass"
+}

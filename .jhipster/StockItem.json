@@ -1,0 +1,77 @@
+{
+  "applications": ["TuniSalesGateway", "InventoryService"],
+  "changelogDate": "20260304094338",
+  "clientRootFolder": "InventoryService",
+  "databaseType": "sql",
+  "dto": "mapstruct",
+  "embedded": false,
+  "entityTableName": "stock_item",
+  "fields": [
+    {
+      "fieldName": "tenantId",
+      "fieldType": "Long",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "productId",
+      "fieldType": "Long",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "productName",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "255"
+    },
+    {
+      "fieldName": "imei",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "15",
+      "fieldValidateRulesMinlength": "15"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "StockItemStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "AVAILABLE,RESERVED,ALLOCATED,IN_TRANSIT,DEPLOYED,DEFECTIVE,MISSING,SOLD,RETIRED"
+    },
+    {
+      "fieldName": "isDeleted",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "acquiredAt",
+      "fieldType": "ZonedDateTime",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "updatedAt",
+      "fieldType": "ZonedDateTime"
+    }
+  ],
+  "fluentMethods": true,
+  "jpaMetamodelFiltering": true,
+  "microserviceName": "InventoryService",
+  "name": "StockItem",
+  "pagination": "pagination",
+  "readOnly": false,
+  "relationships": [
+    {
+      "otherEntityName": "stockMovement",
+      "otherEntityRelationshipName": "stockItem",
+      "relationshipName": "stockMovements",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "warehouse",
+      "otherEntityRelationshipName": "stockItems",
+      "relationshipName": "warehouse",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    }
+  ],
+  "service": "serviceClass"
+}
