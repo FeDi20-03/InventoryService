@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tunisales.inventory.tenant.TenantInterceptor;
 import java.util.*;
 import javax.servlet.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ class WebConfigurerTest {
         env = new MockEnvironment();
         props = new JHipsterProperties();
 
-        webConfigurer = new WebConfigurer(env, props);
+        webConfigurer = new WebConfigurer(env, props, new TenantInterceptor());
     }
 
     @Test

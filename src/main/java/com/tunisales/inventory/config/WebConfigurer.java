@@ -1,5 +1,6 @@
 package com.tunisales.inventory.config;
 
+import com.tunisales.inventory.tenant.TenantInterceptor;
 import javax.servlet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,13 +15,15 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import tech.jhipster.config.JHipsterProperties;
 
 /**
  * Configuration of web application with Servlet 3.0 APIs.
  */
 @Configuration
-public class WebConfigurer implements ServletContextInitializer {
+public class WebConfigurer implements ServletContextInitializer, WebMvcConfigurer {
 
     private final Logger log = LoggerFactory.getLogger(WebConfigurer.class);
 
@@ -28,9 +31,12 @@ public class WebConfigurer implements ServletContextInitializer {
 
     private final JHipsterProperties jHipsterProperties;
 
-    public WebConfigurer(Environment env, JHipsterProperties jHipsterProperties) {
+    private final TenantInterceptor tenantInterceptor;
+
+    public WebConfigurer(Environment env, JHipsterProperties jHipsterProperties, TenantInterceptor tenantInterceptor) {
         this.env = env;
         this.jHipsterProperties = jHipsterProperties;
+        this.tenantInterceptor = tenantInterceptor;
     }
 
     @Override
@@ -40,6 +46,11 @@ public class WebConfigurer implements ServletContextInitializer {
         }
 
         log.info("Web application fully configured");
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(tenantInterceptor).addPathPatterns("/api/**");
     }
 
     @Bean
