@@ -5,6 +5,7 @@ package com.tunisales.inventory.domain.enumeration;
  */
 public enum AuditResolution {
     FOUND,
+    UNEXPECTED,
     LOST_STOLEN,
     SYSTEM_ERROR,
     IN_PROGRESS,

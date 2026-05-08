@@ -11,5 +11,14 @@ public final class AuthoritiesConstants {
 
     public static final String ANONYMOUS = "ROLE_ANONYMOUS";
 
+    // Tunisales business roles
+    public static final String ADMIN_COMMERCIAL = "ROLE_ADMIN_COMMERCIAL";
+
+    public static final String ADMIN_SYSTEME = "ROLE_ADMIN_SYSTEME";
+
+    public static final String COMMERCIAL = "ROLE_COMMERCIAL";
+
+    public static final String MAGASINIER = "ROLE_MAGASINIER";
+
     private AuthoritiesConstants() {}
 }

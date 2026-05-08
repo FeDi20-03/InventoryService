@@ -24,9 +24,14 @@ class TechnicalStructureTest {
         .layer("Domain").definedBy("..domain..")
 
         .whereLayer("Config").mayNotBeAccessedByAnyLayer()
-        .whereLayer("Client").mayNotBeAccessedByAnyLayer()
+        // Outbound HTTP clients (PlatformNotificationClient, GpfReworkClient,
+        // FeignClient interceptors, ...) live in the Client layer and are
+        // injected into Service/Web layers as collaborators.
+        .whereLayer("Client").mayOnlyBeAccessedByLayers("Service", "Web", "Config")
         .whereLayer("Web").mayOnlyBeAccessedByLayers("Config")
-        .whereLayer("Service").mayOnlyBeAccessedByLayers("Web", "Config")
+        // Client depends on service.dto (NotificationPayloadDTO etc.) so we
+        // allow Service to be reached from Client as well.
+        .whereLayer("Service").mayOnlyBeAccessedByLayers("Web", "Config", "Client")
         .whereLayer("Security").mayOnlyBeAccessedByLayers("Config", "Client", "Service", "Web")
         .whereLayer("Persistence").mayOnlyBeAccessedByLayers("Service", "Security", "Web", "Config")
         .whereLayer("Domain").mayOnlyBeAccessedByLayers("Persistence", "Service", "Security", "Web", "Config")

@@ -1,0 +1,4 @@
+- [TuniSales project overview](project_tunisales_overview.md) — multi-service JHipster platform; InventoryService tracks phones by IMEI, multi-tenant via X-Tenant-Id.
+- [InventoryService key paths and dev commands](reference_inventory_service_paths.md) — Cwd, JDK location (set JAVA_HOME explicitly), and Maven test/verify invocations.
+- [testcontainers vs Docker Desktop API mismatch](project_testcontainers_docker_incompatibility.md) — IT tests can't run locally; docker-java client too old for Docker Desktop 4.60+.
+- [Pre-existing JWT unit test failures](project_jwt_test_failures_preexisting.md) — 5 failures + 1 error in JWT/Token tests on master; not regressions.

@@ -13,6 +13,7 @@ import com.tunisales.inventory.domain.StockMovement;
 import com.tunisales.inventory.domain.Warehouse;
 import com.tunisales.inventory.domain.enumeration.StockItemStatus;
 import com.tunisales.inventory.repository.StockItemRepository;
+import com.tunisales.inventory.security.AuthoritiesConstants;
 import com.tunisales.inventory.service.StockItemService;
 import com.tunisales.inventory.service.criteria.StockItemCriteria;
 import com.tunisales.inventory.service.dto.StockItemDTO;
@@ -1327,6 +1328,37 @@ class StockItemResourceIT {
         // Validate the StockItem in the database
         List<StockItem> stockItemList = stockItemRepository.findAll();
         assertThat(stockItemList).hasSize(databaseSizeBeforeUpdate);
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void testScanByImei() throws Exception {
+        // Use a real, Luhn-valid IMEI rather than the AAAA placeholder used elsewhere in this IT.
+        final String validImei = "490154203237518";
+        stockItem.setImei(validImei);
+        stockItemRepository.saveAndFlush(stockItem);
+
+        // Scan: hit found
+        restStockItemMockMvc
+            .perform(post(ENTITY_API_URL + "/scan").contentType(MediaType.APPLICATION_JSON).content("{\"imei\":\"" + validImei + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.imei").value(validImei))
+            .andExpect(jsonPath("$.status").value(stockItem.getStatus().toString()))
+            .andExpect(jsonPath("$.warehouseId").value(stockItem.getWarehouse().getId().intValue()))
+            .andExpect(jsonPath("$.warehouseName").value(stockItem.getWarehouse().getName()))
+            .andExpect(jsonPath("$.warehouseType").value(stockItem.getWarehouse().getType().toString()));
+
+        // Scan: invalid IMEI (non-digit) -> 400
+        restStockItemMockMvc
+            .perform(post(ENTITY_API_URL + "/scan").contentType(MediaType.APPLICATION_JSON).content("{\"imei\":\"AAAAAAAAAAAAAAA\"}"))
+            .andExpect(status().isBadRequest());
+
+        // Scan: valid Luhn but not in database -> 404
+        restStockItemMockMvc
+            .perform(post(ENTITY_API_URL + "/scan").contentType(MediaType.APPLICATION_JSON).content("{\"imei\":\"356938035643809\"}"))
+            .andExpect(status().isNotFound());
     }
 
     @Test

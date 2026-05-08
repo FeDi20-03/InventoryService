@@ -33,6 +33,8 @@ public class StockMovementDTO implements Serializable {
     @NotNull
     private ZonedDateTime createdAt;
 
+    private Boolean confirmedByCommercial;
+
     private WarehouseDTO fromWarehouse;
 
     private WarehouseDTO toWarehouse;
@@ -93,6 +95,14 @@ public class StockMovementDTO implements Serializable {
 
     public void setCreatedAt(ZonedDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getConfirmedByCommercial() {
+        return confirmedByCommercial;
+    }
+
+    public void setConfirmedByCommercial(Boolean confirmedByCommercial) {
+        this.confirmedByCommercial = confirmedByCommercial;
     }
 
     public WarehouseDTO getFromWarehouse() {

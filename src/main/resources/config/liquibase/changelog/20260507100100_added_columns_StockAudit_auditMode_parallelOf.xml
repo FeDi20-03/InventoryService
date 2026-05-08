@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+    <!--
+        1.3 — extended audit workflow:
+          - audit_mode: COUNT (default) or SCAN_ONE_BY_ONE
+          - parallel_of: optional FK to a paired StockAudit, used to detect
+            commercial vs magasinier discrepancies during closeWithParallel.
+
+        The AuditStatus enum is also extended with REOPENED (and SCHEDULED for
+        1.5); the column is varchar so no DDL change is required for that.
+    -->
+    <changeSet id="20260507100100-1" author="tunisales">
+        <addColumn tableName="stock_audit">
+            <column name="audit_mode" type="varchar(50)" defaultValue="COUNT">
+                <constraints nullable="true" />
+            </column>
+            <column name="parallel_of" type="bigint">
+                <constraints nullable="true" />
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260507100100-2" author="tunisales">
+        <addForeignKeyConstraint
+            baseColumnNames="parallel_of"
+            baseTableName="stock_audit"
+            constraintName="fk_stock_audit__parallel_of"
+            referencedColumnNames="id"
+            referencedTableName="stock_audit"
+            onDelete="SET NULL"/>
+    </changeSet>
+</databaseChangeLog>

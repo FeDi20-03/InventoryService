@@ -11,6 +11,7 @@ public enum StockItemStatus {
     DEPLOYED,
     DEFECTIVE,
     MISSING,
+    LOST,
     SOLD,
     RETIRED,
 }

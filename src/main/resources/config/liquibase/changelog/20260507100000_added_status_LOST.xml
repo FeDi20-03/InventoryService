@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+    <!--
+        Documentation-only changeset.
+
+        The {@code stock_item.status} column is a {@code varchar(255)} backed by an
+        application-level {@code StockItemStatus} enum (Hibernate {@code @Enumerated(EnumType.STRING)}).
+        Adding a new enum value (LOST) does not require any DDL change: existing rows
+        keep their current status string, and new rows can now be persisted with
+        the value 'LOST'. This changeset is intentionally a no-op (an empty SQL
+        comment) so the addition of the new status is tracked in Liquibase history.
+    -->
+    <changeSet id="20260507100000-1" author="tunisales">
+        <sql>-- StockItemStatus.LOST added; no schema change required (varchar enum)</sql>
+    </changeSet>
+</databaseChangeLog>

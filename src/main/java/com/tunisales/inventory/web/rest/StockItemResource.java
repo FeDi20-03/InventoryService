@@ -1,14 +1,24 @@
 package com.tunisales.inventory.web.rest;
 
 import com.tunisales.inventory.repository.StockItemRepository;
+import com.tunisales.inventory.security.AuthoritiesConstants;
+import com.tunisales.inventory.security.SecurityUtils;
+import com.tunisales.inventory.service.ReworkRequestService;
 import com.tunisales.inventory.service.StockItemQueryService;
 import com.tunisales.inventory.service.StockItemService;
 import com.tunisales.inventory.service.criteria.StockItemCriteria;
+import com.tunisales.inventory.service.dto.ReworkRequestDTO;
 import com.tunisales.inventory.service.dto.StockItemDTO;
+import com.tunisales.inventory.service.dto.StockItemScanDTO;
+import com.tunisales.inventory.service.util.ImeiValidator;
 import com.tunisales.inventory.web.rest.errors.BadRequestAlertException;
+import com.tunisales.inventory.web.rest.vm.DeclareLostVM;
+import com.tunisales.inventory.web.rest.vm.ImeiScanVM;
+import com.tunisales.inventory.web.rest.vm.SendToReworkVM;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import javax.validation.Valid;
@@ -19,8 +29,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
@@ -46,14 +59,18 @@ public class StockItemResource {
 
     private final StockItemQueryService stockItemQueryService;
 
+    private final ReworkRequestService reworkRequestService;
+
     public StockItemResource(
         StockItemService stockItemService,
         StockItemRepository stockItemRepository,
-        StockItemQueryService stockItemQueryService
+        StockItemQueryService stockItemQueryService,
+        ReworkRequestService reworkRequestService
     ) {
         this.stockItemService = stockItemService;
         this.stockItemRepository = stockItemRepository;
         this.stockItemQueryService = stockItemQueryService;
+        this.reworkRequestService = reworkRequestService;
     }
 
     /**
@@ -187,6 +204,126 @@ public class StockItemResource {
         log.debug("REST request to get StockItem : {}", id);
         Optional<StockItemDTO> stockItemDTO = stockItemService.findOne(id);
         return ResponseUtil.wrapOrNotFound(stockItemDTO);
+    }
+
+    /**
+     * {@code POST  /stock-items/scan} : look up a stock item by IMEI (doucheur workflow).
+     *
+     * <p>The IMEI is validated for length (15 digits) and Luhn checksum.
+     * Returns the enriched {@link StockItemScanDTO} (warehouse name/type, status,
+     * last movement timestamp).</p>
+     *
+     * @param scan request body containing the IMEI to scan.
+     * @return {@code 200 OK} with the scan DTO,
+     *         {@code 400 Bad Request} if the IMEI is syntactically invalid,
+     *         {@code 404 Not Found} if no stock item matches.
+     */
+    @PostMapping("/stock-items/scan")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\", \"" +
+        AuthoritiesConstants.COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.MAGASINIER +
+        "\")"
+    )
+    public ResponseEntity<StockItemScanDTO> scanStockItem(@Valid @RequestBody ImeiScanVM scan) {
+        log.debug("REST request to scan StockItem by IMEI : {}", scan.getImei());
+        if (!ImeiValidator.isValid(scan.getImei())) {
+            throw new BadRequestAlertException("Invalid IMEI", ENTITY_NAME, "imeiinvalid");
+        }
+        return stockItemService
+            .scanByImei(scan.getImei())
+            .map(ResponseEntity::ok)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown IMEI"));
+    }
+
+    /**
+     * {@code POST  /stock-items/{id}/declare-lost} : declare an item LOST.
+     *
+     * <p>The item must currently be in {@code MISSING} status; otherwise a
+     * {@code 409 Conflict} is returned.</p>
+     */
+    @PostMapping("/stock-items/{id}/declare-lost")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\")"
+    )
+    public ResponseEntity<StockItemDTO> declareLost(@PathVariable Long id, @Valid @RequestBody(required = false) DeclareLostVM body) {
+        log.debug("REST request to declare StockItem {} as LOST", id);
+        String reason = body != null ? body.getReason() : null;
+        String declaredBy = SecurityUtils.getCurrentUserLogin().orElse("system");
+        try {
+            StockItemDTO result = stockItemService.declareLost(id, declaredBy, reason);
+            return ResponseEntity.ok(result);
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        } catch (IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage());
+        }
+    }
+
+    /**
+     * {@code POST  /stock-items/{id}/mark-repaired} : mark a DEFECTIVE item as repaired.
+     */
+    @PostMapping("/stock-items/{id}/mark-repaired")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\", \"" +
+        AuthoritiesConstants.MAGASINIER +
+        "\")"
+    )
+    public ResponseEntity<StockItemDTO> markRepaired(@PathVariable Long id) {
+        log.debug("REST request to mark StockItem {} as repaired", id);
+        try {
+            StockItemDTO result = stockItemService.markRepaired(id);
+            return ResponseEntity.ok(result);
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        } catch (IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage());
+        }
+    }
+
+    /**
+     * {@code POST  /stock-items/{id}/send-to-rework} : send a defective item to the GPF rework gateway.
+     */
+    @PostMapping("/stock-items/{id}/send-to-rework")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\", \"" +
+        AuthoritiesConstants.MAGASINIER +
+        "\")"
+    )
+    public ResponseEntity<ReworkRequestDTO> sendToRework(@PathVariable Long id, @Valid @RequestBody(required = false) SendToReworkVM body) {
+        log.debug("REST request to send StockItem {} to rework", id);
+        String reason = body != null ? body.getReason() : null;
+        try {
+            ReworkRequestDTO dto = reworkRequestService.sendToRework(id, reason);
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(dto);
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        }
     }
 
     /**

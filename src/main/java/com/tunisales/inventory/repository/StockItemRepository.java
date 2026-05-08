@@ -37,4 +37,7 @@ public interface StockItemRepository extends JpaRepository<StockItem, Long>, Jpa
 
     @Query("select stockItem from StockItem stockItem left join fetch stockItem.warehouse where stockItem.id =:id")
     Optional<StockItem> findOneWithToOneRelationships(@Param("id") Long id);
+
+    @Query("select stockItem from StockItem stockItem left join fetch stockItem.warehouse where stockItem.imei =:imei")
+    Optional<StockItem> findOneByImeiWithEagerRelationships(@Param("imei") String imei);
 }

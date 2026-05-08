@@ -1,5 +1,6 @@
 package com.tunisales.inventory.service.dto;
 
+import com.tunisales.inventory.domain.enumeration.AuditMode;
 import com.tunisales.inventory.domain.enumeration.AuditStatus;
 import java.io.Serializable;
 import java.time.ZonedDateTime;
@@ -40,6 +41,10 @@ public class StockAuditDTO implements Serializable {
     private ZonedDateTime startedAt;
 
     private ZonedDateTime closedAt;
+
+    private AuditMode auditMode;
+
+    private Long parallelOf;
 
     private WarehouseDTO warehouse;
 
@@ -121,6 +126,22 @@ public class StockAuditDTO implements Serializable {
 
     public void setClosedAt(ZonedDateTime closedAt) {
         this.closedAt = closedAt;
+    }
+
+    public AuditMode getAuditMode() {
+        return auditMode;
+    }
+
+    public void setAuditMode(AuditMode auditMode) {
+        this.auditMode = auditMode;
+    }
+
+    public Long getParallelOf() {
+        return parallelOf;
+    }
+
+    public void setParallelOf(Long parallelOf) {
+        this.parallelOf = parallelOf;
     }
 
     public WarehouseDTO getWarehouse() {

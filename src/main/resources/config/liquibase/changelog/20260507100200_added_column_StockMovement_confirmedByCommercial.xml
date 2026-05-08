@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+    <!--
+        1.4 — Validation alimentation voiture (commercial confirmation):
+        adds a nullable boolean confirmed_by_commercial flag on stock_movement.
+
+        Rules enforced at the service layer:
+          - Only ROLE_COMMERCIAL can flip the flag (via the dedicated endpoint),
+            and only on INBOUND movements landing on a LOCAL warehouse.
+          - OUTBOUND/TRANSFER from a LOCAL warehouse is rejected (409) until the
+            most recent INBOUND on that warehouse has been confirmed.
+    -->
+    <changeSet id="20260507100200-1" author="tunisales">
+        <addColumn tableName="stock_movement">
+            <column name="confirmed_by_commercial" type="boolean">
+                <constraints nullable="true" />
+            </column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

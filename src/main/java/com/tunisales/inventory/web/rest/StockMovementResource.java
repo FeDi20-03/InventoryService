@@ -1,6 +1,8 @@
 package com.tunisales.inventory.web.rest;
 
 import com.tunisales.inventory.repository.StockMovementRepository;
+import com.tunisales.inventory.security.AuthoritiesConstants;
+import com.tunisales.inventory.security.SecurityUtils;
 import com.tunisales.inventory.service.StockMovementQueryService;
 import com.tunisales.inventory.service.StockMovementService;
 import com.tunisales.inventory.service.criteria.StockMovementCriteria;
@@ -9,6 +11,7 @@ import com.tunisales.inventory.web.rest.errors.BadRequestAlertException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import javax.validation.Valid;
@@ -19,8 +22,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
@@ -70,11 +76,36 @@ public class StockMovementResource {
         if (stockMovementDTO.getId() != null) {
             throw new BadRequestAlertException("A new stockMovement cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        StockMovementDTO result = stockMovementService.save(stockMovementDTO);
+        StockMovementDTO result;
+        try {
+            result = stockMovementService.save(stockMovementDTO);
+        } catch (IllegalStateException ex) {
+            // 1.4 — outbound from a LOCAL warehouse blocked while the latest
+            // INBOUND has not been validated by a commercial.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage());
+        }
         return ResponseEntity
             .created(new URI("/api/stock-movements/" + result.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, true, ENTITY_NAME, result.getId().toString()))
             .body(result);
+    }
+
+    /**
+     * {@code POST /stock-movements/{id}/validate-by-commercial} : confirm an
+     * INBOUND movement onto a LOCAL warehouse. Restricted to ROLE_COMMERCIAL.
+     */
+    @PostMapping("/stock-movements/{id}/validate-by-commercial")
+    @PreAuthorize("hasAnyAuthority(\"" + AuthoritiesConstants.ADMIN + "\", \"" + AuthoritiesConstants.COMMERCIAL + "\")")
+    public ResponseEntity<StockMovementDTO> validateByCommercial(@PathVariable Long id) {
+        log.debug("REST request to validate movement {} by commercial", id);
+        String login = SecurityUtils.getCurrentUserLogin().orElse(null);
+        try {
+            return ResponseEntity.ok(stockMovementService.validateByCommercial(id, login));
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        } catch (IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage());
+        }
     }
 
     /**

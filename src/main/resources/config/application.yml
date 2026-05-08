@@ -242,3 +242,28 @@ jhipster:
 # ===================================================================
 
 # application:
+
+# ===================================================================
+# Tunisales-specific properties (Étapes 1.2 → 1.7)
+# ===================================================================
+tunisales:
+  platform:
+    # Base URL of the PlatformService (Eureka logical name in dev/prod;
+    # overridden in tests with a wiremock or a no-op host).
+    url: http://platformservice
+  inventory:
+    # Name of the SITE warehouse used as the destination for repaired items
+    # (StockItemService.markRepaired). Falls back to "first active SITE
+    # warehouse by id" if no warehouse with this name exists.
+    default-site-warehouse: MAIN_SITE
+    audit:
+      # Weekly LOCAL warehouse (vehicles) audit: Monday 06:00.
+      local-cron: '0 0 6 * * MON'
+      # Monthly SITE warehouse (depots) audit: 1st of the month, 06:00.
+      site-cron: '0 0 6 1 * *'
+  gpf:
+    rework:
+      # GPF Rework gateway endpoint that accepts {imei, defectReason} POST bodies.
+      url: http://gpf.example/api/rework
+      # Shared secret expected on the X-Gpf-Signature header of the callback.
+      secret: change-me

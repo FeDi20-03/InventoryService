@@ -24,5 +24,9 @@
     <include file="config/liquibase/changelog/20260304094438_added_entity_constraints_StockMovement.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260304094538_added_entity_constraints_Swap.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-constraints-changelog - JHipster will add liquibase constraints changelogs here -->
+    <include file="config/liquibase/changelog/20260507100000_added_status_LOST.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260507100100_added_columns_StockAudit_auditMode_parallelOf.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260507100200_added_column_StockMovement_confirmedByCommercial.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260507100300_added_entity_ReworkRequest.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>

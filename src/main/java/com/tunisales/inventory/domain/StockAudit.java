@@ -1,6 +1,7 @@
 package com.tunisales.inventory.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.tunisales.inventory.domain.enumeration.AuditMode;
 import com.tunisales.inventory.domain.enumeration.AuditStatus;
 import java.io.Serializable;
 import java.time.ZonedDateTime;
@@ -61,6 +62,13 @@ public class StockAudit implements Serializable {
 
     @Column(name = "closed_at")
     private ZonedDateTime closedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "audit_mode")
+    private AuditMode auditMode;
+
+    @Column(name = "parallel_of")
+    private Long parallelOf;
 
     @OneToMany(mappedBy = "audit")
     @JsonIgnoreProperties(value = { "stockItem", "audit" }, allowSetters = true)
@@ -201,6 +209,32 @@ public class StockAudit implements Serializable {
 
     public void setClosedAt(ZonedDateTime closedAt) {
         this.closedAt = closedAt;
+    }
+
+    public AuditMode getAuditMode() {
+        return this.auditMode;
+    }
+
+    public StockAudit auditMode(AuditMode auditMode) {
+        this.setAuditMode(auditMode);
+        return this;
+    }
+
+    public void setAuditMode(AuditMode auditMode) {
+        this.auditMode = auditMode;
+    }
+
+    public Long getParallelOf() {
+        return this.parallelOf;
+    }
+
+    public StockAudit parallelOf(Long parallelOf) {
+        this.setParallelOf(parallelOf);
+        return this;
+    }
+
+    public void setParallelOf(Long parallelOf) {
+        this.parallelOf = parallelOf;
     }
 
     public Set<StockAuditLine> getAuditLines() {

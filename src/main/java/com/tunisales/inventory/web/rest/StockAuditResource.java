@@ -1,14 +1,19 @@
 package com.tunisales.inventory.web.rest;
 
+import com.tunisales.inventory.domain.StockAuditLine;
 import com.tunisales.inventory.repository.StockAuditRepository;
+import com.tunisales.inventory.security.AuthoritiesConstants;
 import com.tunisales.inventory.service.StockAuditQueryService;
 import com.tunisales.inventory.service.StockAuditService;
 import com.tunisales.inventory.service.criteria.StockAuditCriteria;
 import com.tunisales.inventory.service.dto.StockAuditDTO;
+import com.tunisales.inventory.service.util.ImeiValidator;
 import com.tunisales.inventory.web.rest.errors.BadRequestAlertException;
+import com.tunisales.inventory.web.rest.vm.ImeiScanVM;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import javax.validation.Valid;
@@ -19,8 +24,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
@@ -187,6 +195,86 @@ public class StockAuditResource {
         log.debug("REST request to get StockAudit : {}", id);
         Optional<StockAuditDTO> stockAuditDTO = stockAuditService.findOne(id);
         return ResponseUtil.wrapOrNotFound(stockAuditDTO);
+    }
+
+    /**
+     * {@code POST /stock-audits/{id}/record-count} : record a head-count for an audit.
+     * If counted differs from theoretical, the audit auto-switches to SCAN_ONE_BY_ONE.
+     */
+    @PostMapping("/stock-audits/{id}/record-count")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\", \"" +
+        AuthoritiesConstants.MAGASINIER +
+        "\", \"" +
+        AuthoritiesConstants.COMMERCIAL +
+        "\")"
+    )
+    public ResponseEntity<StockAuditDTO> recordCount(@PathVariable Long id, @RequestParam("counted") int counted) {
+        log.debug("REST request to record count {} on audit {}", counted, id);
+        try {
+            return ResponseEntity.ok(stockAuditService.recordCount(id, counted));
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        }
+    }
+
+    /**
+     * {@code POST /stock-audits/{id}/scan} : register an IMEI scan against the audit.
+     */
+    @PostMapping("/stock-audits/{id}/scan")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\", \"" +
+        AuthoritiesConstants.MAGASINIER +
+        "\", \"" +
+        AuthoritiesConstants.COMMERCIAL +
+        "\")"
+    )
+    public ResponseEntity<Long> scan(@PathVariable Long id, @Valid @RequestBody ImeiScanVM scan) {
+        log.debug("REST request to scan IMEI {} on audit {}", scan.getImei(), id);
+        if (!ImeiValidator.isValid(scan.getImei())) {
+            throw new BadRequestAlertException("Invalid IMEI", ENTITY_NAME, "imeiinvalid");
+        }
+        try {
+            StockAuditLine line = stockAuditService.scanLine(id, scan.getImei());
+            return ResponseEntity.status(HttpStatus.CREATED).body(line.getId());
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        }
+    }
+
+    /**
+     * {@code POST /stock-audits/{id}/close-with-parallel} : close an audit and
+     * reconcile with its paired audit. On discrepancy, both audits are reopened.
+     */
+    @PostMapping("/stock-audits/{id}/close-with-parallel")
+    @PreAuthorize(
+        "hasAnyAuthority(\"" +
+        AuthoritiesConstants.ADMIN +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_COMMERCIAL +
+        "\", \"" +
+        AuthoritiesConstants.ADMIN_SYSTEME +
+        "\")"
+    )
+    public ResponseEntity<StockAuditDTO> closeWithParallel(@PathVariable Long id) {
+        log.debug("REST request to close audit {} with parallel reconciliation", id);
+        try {
+            return ResponseEntity.ok(stockAuditService.closeWithParallel(id));
+        } catch (NoSuchElementException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        }
     }
 
     /**

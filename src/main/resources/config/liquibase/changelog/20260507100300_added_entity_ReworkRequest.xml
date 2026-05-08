@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+    <!--
+        1.7 — Hook Rework GPF: persistent record of every defective-item rework
+        request sent to the GPF system. The lifecycle (PENDING -> ACK ->
+        COMPLETED|FAILED) is updated by the GpfReworkClient and by the
+        webhook callback handler.
+    -->
+    <changeSet id="20260507100300-1" author="tunisales">
+        <createTable tableName="rework_request">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="bigint">
+                <constraints nullable="false" />
+            </column>
+            <column name="external_id" type="varchar(100)">
+                <constraints nullable="true" />
+            </column>
+            <column name="status" type="varchar(50)">
+                <constraints nullable="false" />
+            </column>
+            <column name="sent_at" type="${datetimeType}">
+                <constraints nullable="false" />
+            </column>
+            <column name="completed_at" type="${datetimeType}">
+                <constraints nullable="true" />
+            </column>
+            <column name="payload_json" type="${clobType}">
+                <constraints nullable="true" />
+            </column>
+            <column name="stock_item_id" type="bigint">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+        <dropDefaultValue tableName="rework_request" columnName="sent_at" columnDataType="${datetimeType}"/>
+        <dropDefaultValue tableName="rework_request" columnName="completed_at" columnDataType="${datetimeType}"/>
+    </changeSet>
+
+    <changeSet id="20260507100300-2" author="tunisales">
+        <addForeignKeyConstraint
+            baseColumnNames="stock_item_id"
+            baseTableName="rework_request"
+            constraintName="fk_rework_request__stock_item_id"
+            referencedColumnNames="id"
+            referencedTableName="stock_item"/>
+    </changeSet>
+</databaseChangeLog>

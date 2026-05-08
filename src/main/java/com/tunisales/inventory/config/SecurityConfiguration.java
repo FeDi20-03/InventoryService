@@ -48,6 +48,9 @@ public class SecurityConfiguration {
         .and()
             .authorizeRequests()
             .antMatchers("/api/authenticate").permitAll()
+            // GPF rework callback is authenticated via the X-Gpf-Signature
+            // header (shared-secret), not via the JWT chain.
+            .antMatchers(HttpMethod.POST, "/api/rework-requests/callback").permitAll()
             .antMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
             .antMatchers("/api/**").authenticated()
             .antMatchers("/management/health").permitAll()

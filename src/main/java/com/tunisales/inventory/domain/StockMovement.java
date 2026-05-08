@@ -49,6 +49,9 @@ public class StockMovement implements Serializable {
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdAt;
 
+    @Column(name = "confirmed_by_commercial")
+    private Boolean confirmedByCommercial;
+
     @ManyToOne
     @JsonIgnoreProperties(value = { "stockItems" }, allowSetters = true)
     private Warehouse fromWarehouse;
@@ -153,6 +156,19 @@ public class StockMovement implements Serializable {
 
     public void setCreatedAt(ZonedDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getConfirmedByCommercial() {
+        return this.confirmedByCommercial;
+    }
+
+    public StockMovement confirmedByCommercial(Boolean confirmedByCommercial) {
+        this.setConfirmedByCommercial(confirmedByCommercial);
+        return this;
+    }
+
+    public void setConfirmedByCommercial(Boolean confirmedByCommercial) {
+        this.confirmedByCommercial = confirmedByCommercial;
     }
 
     public Warehouse getFromWarehouse() {
