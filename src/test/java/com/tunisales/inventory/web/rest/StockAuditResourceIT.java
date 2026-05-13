@@ -8,11 +8,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.tunisales.inventory.IntegrationTest;
+import com.tunisales.inventory.client.PlatformNotificationClient;
 import com.tunisales.inventory.domain.StockAudit;
 import com.tunisales.inventory.domain.StockAuditLine;
+import com.tunisales.inventory.domain.StockItem;
 import com.tunisales.inventory.domain.Warehouse;
+import com.tunisales.inventory.domain.enumeration.AuditMode;
 import com.tunisales.inventory.domain.enumeration.AuditStatus;
+import com.tunisales.inventory.domain.enumeration.StockItemStatus;
 import com.tunisales.inventory.repository.StockAuditRepository;
+import com.tunisales.inventory.repository.StockItemRepository;
+import com.tunisales.inventory.security.AuthoritiesConstants;
 import com.tunisales.inventory.service.StockAuditService;
 import com.tunisales.inventory.service.criteria.StockAuditCriteria;
 import com.tunisales.inventory.service.dto.StockAuditDTO;
@@ -33,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -106,6 +113,12 @@ class StockAuditResourceIT {
 
     @Autowired
     private MockMvc restStockAuditMockMvc;
+
+    @Autowired
+    private StockItemRepository stockItemRepository;
+
+    @MockBean
+    private PlatformNotificationClient notificationClientBean;
 
     private StockAudit stockAudit;
 
@@ -1451,6 +1464,132 @@ class StockAuditResourceIT {
         // Validate the StockAudit in the database
         List<StockAudit> stockAuditList = stockAuditRepository.findAll();
         assertThat(stockAuditList).hasSize(databaseSizeBeforeUpdate);
+    }
+
+    // ===================================================================
+    //  Étape 1.3 — Extended audit workflow endpoints
+    // ===================================================================
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void recordCount_returnsOkAndSwitchesToScanModeWhenDiscrepancy() throws Exception {
+        // Arrange
+        stockAudit.setStatus(AuditStatus.IN_PROGRESS);
+        stockAudit.setAuditMode(AuditMode.COUNT);
+        stockAudit.setTheoreticalCount(10);
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        // Act + Assert
+        restStockAuditMockMvc
+            .perform(post("/api/stock-audits/{id}/record-count?counted=7", stockAudit.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.physicalCount").value(7))
+            .andExpect(jsonPath("$.discrepancyCount").value(3))
+            .andExpect(jsonPath("$.auditMode").value(AuditMode.SCAN_ONE_BY_ONE.toString()));
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void scanLine_returnsCreatedWhenItemBelongsToAuditedWarehouse() throws Exception {
+        // Arrange — same warehouse for both audit & item makes the scan FOUND.
+        stockAudit.setStatus(AuditStatus.IN_PROGRESS);
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        StockItem item = StockItemResourceIT.createEntity(em);
+        item.setImei("490154203237518");
+        item.setStatus(StockItemStatus.AVAILABLE);
+        item.setWarehouse(stockAudit.getWarehouse());
+        stockItemRepository.saveAndFlush(item);
+
+        // Act + Assert
+        restStockAuditMockMvc
+            .perform(
+                post("/api/stock-audits/{id}/scan", stockAudit.getId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"imei\":\"490154203237518\"}")
+            )
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void scanLine_returnsBadRequestForInvalidImei() throws Exception {
+        // Arrange
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        // Act + Assert
+        restStockAuditMockMvc
+            .perform(
+                post("/api/stock-audits/{id}/scan", stockAudit.getId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"imei\":\"NOT-AN-IMEI\"}")
+            )
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void scanLine_returnsNotFoundForUnknownImei() throws Exception {
+        // Arrange — Luhn-valid IMEI not present in DB.
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        // Act + Assert
+        restStockAuditMockMvc
+            .perform(
+                post("/api/stock-audits/{id}/scan", stockAudit.getId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"imei\":\"356938035643809\"}")
+            )
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.ADMIN })
+    void closeWithParallel_reopensBothWhenCountsDisagree() throws Exception {
+        // Arrange — primary and parallel audits with diverging physicalCount.
+        stockAudit.setStatus(AuditStatus.IN_PROGRESS);
+        stockAudit.setPhysicalCount(8);
+        stockAudit.setDiscrepancyCount(2);
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        StockAudit parallel = StockAuditResourceIT.createEntity(em);
+        parallel.setStatus(AuditStatus.IN_PROGRESS);
+        parallel.setPhysicalCount(10);
+        parallel.setDiscrepancyCount(0);
+        stockAuditRepository.saveAndFlush(parallel);
+
+        stockAudit.setParallelOf(parallel.getId());
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        // Act + Assert
+        restStockAuditMockMvc
+            .perform(post("/api/stock-audits/{id}/close-with-parallel", stockAudit.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(AuditStatus.REOPENED.toString()));
+
+        StockAudit reloadedParallel = stockAuditRepository.findById(parallel.getId()).orElseThrow();
+        assertThat(reloadedParallel.getStatus()).isEqualTo(AuditStatus.REOPENED);
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.ADMIN })
+    void closeWithParallel_simpleClosureWhenNoParallelOrCountsAgree() throws Exception {
+        // Arrange — no parallelOf set, just a simple close.
+        stockAudit.setStatus(AuditStatus.IN_PROGRESS);
+        stockAudit.setParallelOf(null);
+        stockAuditRepository.saveAndFlush(stockAudit);
+
+        // Act + Assert
+        restStockAuditMockMvc
+            .perform(post("/api/stock-audits/{id}/close-with-parallel", stockAudit.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(AuditStatus.CLOSED.toString()));
     }
 
     @Test

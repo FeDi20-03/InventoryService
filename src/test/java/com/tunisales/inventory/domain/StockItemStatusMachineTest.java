@@ -4,7 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.tunisales.inventory.domain.enumeration.StockItemStatus;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit tests for {@link StockItemStatusMachine}.
@@ -105,5 +109,92 @@ class StockItemStatusMachineTest {
     @Test
     void defectiveCanBeRetired() {
         assertThat(StockItemStatusMachine.canTransition(StockItemStatus.DEFECTIVE, StockItemStatus.RETIRED)).isTrue();
+    }
+
+    /**
+     * Parametrised exhaustive coverage of the EXPECTED-ALLOWED transition table.
+     *
+     * <p>Each pair below corresponds to a row in {@link StockItemStatusMachine#allowedNextStates(StockItemStatus)}
+     * — keeping it here gives us a tight regression guard against accidental
+     * loosening of the rules.</p>
+     */
+    static Stream<Arguments> allowedTransitions() {
+        return Stream.of(
+            Arguments.of(StockItemStatus.AVAILABLE, StockItemStatus.RESERVED),
+            Arguments.of(StockItemStatus.AVAILABLE, StockItemStatus.ALLOCATED),
+            Arguments.of(StockItemStatus.AVAILABLE, StockItemStatus.IN_TRANSIT),
+            Arguments.of(StockItemStatus.AVAILABLE, StockItemStatus.DEFECTIVE),
+            Arguments.of(StockItemStatus.AVAILABLE, StockItemStatus.MISSING),
+            Arguments.of(StockItemStatus.AVAILABLE, StockItemStatus.RETIRED),
+            Arguments.of(StockItemStatus.RESERVED, StockItemStatus.AVAILABLE),
+            Arguments.of(StockItemStatus.RESERVED, StockItemStatus.ALLOCATED),
+            Arguments.of(StockItemStatus.RESERVED, StockItemStatus.IN_TRANSIT),
+            Arguments.of(StockItemStatus.ALLOCATED, StockItemStatus.IN_TRANSIT),
+            Arguments.of(StockItemStatus.ALLOCATED, StockItemStatus.AVAILABLE),
+            Arguments.of(StockItemStatus.ALLOCATED, StockItemStatus.DEPLOYED),
+            Arguments.of(StockItemStatus.IN_TRANSIT, StockItemStatus.DEPLOYED),
+            Arguments.of(StockItemStatus.IN_TRANSIT, StockItemStatus.AVAILABLE),
+            Arguments.of(StockItemStatus.IN_TRANSIT, StockItemStatus.MISSING),
+            Arguments.of(StockItemStatus.DEPLOYED, StockItemStatus.SOLD),
+            Arguments.of(StockItemStatus.DEPLOYED, StockItemStatus.DEFECTIVE),
+            Arguments.of(StockItemStatus.DEPLOYED, StockItemStatus.AVAILABLE),
+            Arguments.of(StockItemStatus.DEPLOYED, StockItemStatus.MISSING),
+            Arguments.of(StockItemStatus.DEFECTIVE, StockItemStatus.AVAILABLE),
+            Arguments.of(StockItemStatus.DEFECTIVE, StockItemStatus.RETIRED),
+            Arguments.of(StockItemStatus.MISSING, StockItemStatus.AVAILABLE),
+            Arguments.of(StockItemStatus.MISSING, StockItemStatus.LOST)
+        );
+    }
+
+    @ParameterizedTest(name = "{0} -> {1} is allowed")
+    @MethodSource("allowedTransitions")
+    void allTabulatedTransitionsAreAllowed(StockItemStatus from, StockItemStatus to) {
+        // Arrange — none (pure function)
+
+        // Act
+        boolean canTransition = StockItemStatusMachine.canTransition(from, to);
+
+        // Assert
+        assertThat(canTransition).isTrue();
+        // assertCanTransition must not throw for the same input.
+        StockItemStatusMachine.assertCanTransition(from, to);
+        assertThat(StockItemStatusMachine.allowedNextStates(from)).contains(to);
+    }
+
+    /**
+     * Cross-product of every status pair: any combination NOT enumerated by
+     * {@link #allowedTransitions()} must be rejected — both {@code canTransition}
+     * returning false AND {@code assertCanTransition} throwing.
+     */
+    @ParameterizedTest(name = "{0} -> {1} is forbidden")
+    @MethodSource("forbiddenTransitions")
+    void allOtherTransitionsAreForbiddenAndThrow(StockItemStatus from, StockItemStatus to) {
+        // Act
+        boolean canTransition = StockItemStatusMachine.canTransition(from, to);
+
+        // Assert
+        assertThat(canTransition).isFalse();
+        assertThatThrownBy(() -> StockItemStatusMachine.assertCanTransition(from, to))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Illegal StockItem status transition");
+    }
+
+    static Stream<Arguments> forbiddenTransitions() {
+        java.util.Set<java.util.AbstractMap.SimpleEntry<StockItemStatus, StockItemStatus>> allowed = allowedTransitions()
+            .map(args -> new java.util.AbstractMap.SimpleEntry<>((StockItemStatus) args.get()[0], (StockItemStatus) args.get()[1]))
+            .collect(java.util.stream.Collectors.toSet());
+        Stream.Builder<Arguments> builder = Stream.builder();
+        for (StockItemStatus from : StockItemStatus.values()) {
+            for (StockItemStatus to : StockItemStatus.values()) {
+                if (from == to) {
+                    continue; // self-transition is exercised separately
+                }
+                if (allowed.contains(new java.util.AbstractMap.SimpleEntry<>(from, to))) {
+                    continue;
+                }
+                builder.add(Arguments.of(from, to));
+            }
+        }
+        return builder.build();
     }
 }

@@ -8,11 +8,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.tunisales.inventory.IntegrationTest;
+import com.tunisales.inventory.client.GpfReworkClient;
+import com.tunisales.inventory.client.PlatformNotificationClient;
 import com.tunisales.inventory.domain.StockItem;
 import com.tunisales.inventory.domain.StockMovement;
 import com.tunisales.inventory.domain.Warehouse;
 import com.tunisales.inventory.domain.enumeration.StockItemStatus;
+import com.tunisales.inventory.domain.enumeration.WarehouseType;
 import com.tunisales.inventory.repository.StockItemRepository;
+import com.tunisales.inventory.repository.WarehouseRepository;
 import com.tunisales.inventory.security.AuthoritiesConstants;
 import com.tunisales.inventory.service.StockItemService;
 import com.tunisales.inventory.service.criteria.StockItemCriteria;
@@ -24,16 +28,20 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -102,6 +110,15 @@ class StockItemResourceIT {
 
     @Autowired
     private MockMvc restStockItemMockMvc;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @MockBean
+    private PlatformNotificationClient notificationClientBean;
+
+    @MockBean
+    private GpfReworkClient gpfReworkClientBean;
 
     private StockItem stockItem;
 
@@ -1358,6 +1375,142 @@ class StockItemResourceIT {
         // Scan: valid Luhn but not in database -> 404
         restStockItemMockMvc
             .perform(post(ENTITY_API_URL + "/scan").contentType(MediaType.APPLICATION_JSON).content("{\"imei\":\"356938035643809\"}"))
+            .andExpect(status().isNotFound());
+    }
+
+    // ===================================================================
+    //  Custom workflow endpoints — Étape 1.2 / 1.3 / rework
+    // ===================================================================
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.ADMIN_COMMERCIAL })
+    void declareLost_returnsOkWhenItemIsMissing() throws Exception {
+        // Arrange — start the item in MISSING (the only legal precondition).
+        stockItem.setImei("490154203237518");
+        stockItem.setStatus(StockItemStatus.MISSING);
+        stockItemRepository.saveAndFlush(stockItem);
+
+        // Act + Assert
+        restStockItemMockMvc
+            .perform(
+                post("/api/stock-items/{id}/declare-lost", stockItem.getId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"stolen during delivery\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(StockItemStatus.LOST.toString()));
+
+        StockItem reloaded = stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(StockItemStatus.LOST);
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.ADMIN })
+    void declareLost_returnsConflictWhenItemNotMissing() throws Exception {
+        // Arrange — AVAILABLE -> LOST is forbidden by StockItemStatusMachine.
+        stockItem.setImei("490154203237518");
+        stockItem.setStatus(StockItemStatus.AVAILABLE);
+        stockItemRepository.saveAndFlush(stockItem);
+
+        // Act + Assert
+        restStockItemMockMvc
+            .perform(post("/api/stock-items/{id}/declare-lost", stockItem.getId()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isConflict());
+
+        StockItem reloaded = stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(StockItemStatus.AVAILABLE);
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.ADMIN })
+    void declareLost_returnsNotFoundWhenIdMissing() throws Exception {
+        // Arrange — ensure no entity with that absurd id exists.
+        // Act + Assert
+        restStockItemMockMvc
+            .perform(post("/api/stock-items/{id}/declare-lost", Long.MAX_VALUE).contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void markRepaired_returnsOkAndMovesItemBackToAvailable() throws Exception {
+        // Arrange — DEFECTIVE is the only legal precondition. We also need a
+        // SITE warehouse to be available because StockItemService.markRepaired
+        // moves the item there.
+        Warehouse site = new Warehouse()
+            .tenantId(1L)
+            .name("MAIN_SITE")
+            .type(WarehouseType.SITE)
+            .address("addr")
+            .city("city")
+            .minThreshold(0)
+            .isActive(true)
+            .createdAt(DEFAULT_ACQUIRED_AT)
+            .updatedAt(DEFAULT_UPDATED_AT);
+        warehouseRepository.saveAndFlush(site);
+
+        stockItem.setImei("490154203237518");
+        stockItem.setStatus(StockItemStatus.DEFECTIVE);
+        stockItemRepository.saveAndFlush(stockItem);
+
+        // Act + Assert
+        restStockItemMockMvc
+            .perform(post("/api/stock-items/{id}/mark-repaired", stockItem.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(StockItemStatus.AVAILABLE.toString()));
+
+        StockItem reloaded = stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(StockItemStatus.AVAILABLE);
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void markRepaired_returnsConflictWhenItemNotDefective() throws Exception {
+        // Arrange
+        stockItem.setImei("490154203237518");
+        stockItem.setStatus(StockItemStatus.AVAILABLE);
+        stockItemRepository.saveAndFlush(stockItem);
+
+        // Act + Assert
+        restStockItemMockMvc.perform(post("/api/stock-items/{id}/mark-repaired", stockItem.getId())).andExpect(status().isConflict());
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void sendToRework_returnsAcceptedAndPersistsExternalId() throws Exception {
+        // Arrange
+        stockItem.setImei("490154203237518");
+        stockItem.setStatus(StockItemStatus.DEFECTIVE);
+        stockItemRepository.saveAndFlush(stockItem);
+        Mockito
+            .when(gpfReworkClientBean.sendRework(ArgumentMatchers.eq("490154203237518"), ArgumentMatchers.anyString()))
+            .thenReturn(Optional.of("GPF-EXT-1"));
+
+        // Act + Assert
+        restStockItemMockMvc
+            .perform(
+                post("/api/stock-items/{id}/send-to-rework", stockItem.getId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"battery dead\"}")
+            )
+            .andExpect(status().isAccepted())
+            .andExpect(jsonPath("$.externalId").value("GPF-EXT-1"));
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.MAGASINIER })
+    void sendToRework_returnsNotFoundForUnknownItem() throws Exception {
+        // Arrange — no setup
+        // Act + Assert
+        restStockItemMockMvc
+            .perform(post("/api/stock-items/{id}/send-to-rework", Long.MAX_VALUE).contentType(MediaType.APPLICATION_JSON).content("{}"))
             .andExpect(status().isNotFound());
     }
 

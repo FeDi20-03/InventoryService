@@ -8,11 +8,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.tunisales.inventory.IntegrationTest;
+import com.tunisales.inventory.client.PlatformNotificationClient;
 import com.tunisales.inventory.domain.StockItem;
 import com.tunisales.inventory.domain.StockMovement;
 import com.tunisales.inventory.domain.Warehouse;
 import com.tunisales.inventory.domain.enumeration.MovementType;
+import com.tunisales.inventory.domain.enumeration.WarehouseType;
 import com.tunisales.inventory.repository.StockMovementRepository;
+import com.tunisales.inventory.security.AuthoritiesConstants;
 import com.tunisales.inventory.service.StockMovementService;
 import com.tunisales.inventory.service.criteria.StockMovementCriteria;
 import com.tunisales.inventory.service.dto.StockMovementDTO;
@@ -33,6 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -93,6 +97,9 @@ class StockMovementResourceIT {
 
     @Autowired
     private MockMvc restStockMovementMockMvc;
+
+    @MockBean
+    private PlatformNotificationClient notificationClientBean;
 
     private StockMovement stockMovement;
 
@@ -1119,6 +1126,104 @@ class StockMovementResourceIT {
         // Validate the StockMovement in the database
         List<StockMovement> stockMovementList = stockMovementRepository.findAll();
         assertThat(stockMovementList).hasSize(databaseSizeBeforeUpdate);
+    }
+
+    // ===================================================================
+    //  Étape 1.4 — Commercial validation of vehicle alimentation
+    // ===================================================================
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(
+        username = "commercial1",
+        authorities = { AuthoritiesConstants.COMMERCIAL }
+    )
+    void validateByCommercial_returnsOkAndFlipsConfirmedFlag() throws Exception {
+        // Arrange — INBOUND landing on a LOCAL warehouse is the only legal case.
+        Warehouse local = new Warehouse()
+            .tenantId(1L)
+            .name("CAR-A")
+            .type(WarehouseType.LOCAL)
+            .address("addr")
+            .city("Tunis")
+            .minThreshold(0)
+            .isActive(true)
+            .createdAt(DEFAULT_CREATED_AT)
+            .updatedAt(DEFAULT_CREATED_AT);
+        em.persist(local);
+
+        StockItem item = StockItemResourceIT.createEntity(em);
+        em.persist(item);
+        em.flush();
+
+        StockMovement movement = new StockMovement()
+            .movementType(MovementType.INBOUND)
+            .reason("alimentation")
+            .reference("REF-1")
+            .quantity(1)
+            .createdAt(DEFAULT_CREATED_AT)
+            .stockItem(item)
+            .toWarehouse(local)
+            .confirmedByCommercial(false);
+        stockMovementRepository.saveAndFlush(movement);
+
+        // Act + Assert
+        restStockMovementMockMvc
+            .perform(post("/api/stock-movements/{id}/validate-by-commercial", movement.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.confirmedByCommercial").value(true));
+
+        StockMovement reloaded = stockMovementRepository.findById(movement.getId()).orElseThrow();
+        assertThat(reloaded.getConfirmedByCommercial()).isTrue();
+        assertThat(reloaded.getPerformedByLogin()).isEqualTo("commercial1");
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.COMMERCIAL })
+    void validateByCommercial_returnsConflictWhenMovementIsOutbound() throws Exception {
+        // Arrange — OUTBOUND should be rejected with 409.
+        Warehouse local = new Warehouse()
+            .tenantId(1L)
+            .name("CAR-B")
+            .type(WarehouseType.LOCAL)
+            .address("addr")
+            .city("Tunis")
+            .minThreshold(0)
+            .isActive(true)
+            .createdAt(DEFAULT_CREATED_AT)
+            .updatedAt(DEFAULT_CREATED_AT);
+        em.persist(local);
+
+        StockItem item = StockItemResourceIT.createEntity(em);
+        em.persist(item);
+        em.flush();
+
+        StockMovement movement = new StockMovement()
+            .movementType(MovementType.OUTBOUND)
+            .reason("sale")
+            .reference("REF-2")
+            .quantity(1)
+            .createdAt(DEFAULT_CREATED_AT)
+            .stockItem(item)
+            .toWarehouse(local);
+        stockMovementRepository.saveAndFlush(movement);
+
+        // Act + Assert
+        restStockMovementMockMvc
+            .perform(post("/api/stock-movements/{id}/validate-by-commercial", movement.getId()))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    @Transactional
+    @org.springframework.security.test.context.support.WithMockUser(authorities = { AuthoritiesConstants.COMMERCIAL })
+    void validateByCommercial_returnsNotFoundForUnknownId() throws Exception {
+        // Arrange — none.
+        // Act + Assert
+        restStockMovementMockMvc
+            .perform(post("/api/stock-movements/{id}/validate-by-commercial", Long.MAX_VALUE))
+            .andExpect(status().isNotFound());
     }
 
     @Test
